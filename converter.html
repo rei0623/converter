@@ -21,6 +21,8 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="https://unpkg.com/turndown/dist/turndown.js"></script>
+    <script src="https://unpkg.com/docx@7.8.2/build/index.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/FileSaver.js/2.0.5/FileSaver.min.js"></script>
 
     <!-- 4. プレゼンテーション用ライブラリ (Marpit) -->
     <script src="https://cdn.jsdelivr.net/npm/@marp-team/marpit/dist/marpit.browser.js"></script>
@@ -49,7 +51,7 @@
         #toc-sidebar h3 { margin-top: 0; color: var(--header-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
         #toc-list { list-style: none; padding-left: 0; }
         #toc-list li { margin-bottom: 8px; }
-        #toc-list a { color: var(--sub-text-color); text-decoration: none; transition: color 0.2s; font-size: 14px; }
+        #toc-list a { color: var(--sub-text-color); text-decoration: none; transition: color 0.2s; font-size: 14px; display: block; }
         #toc-list a:hover { color: var(--header-color); }
         #toc-list .h1 { font-weight: bold; }
         #toc-list .h2 { padding-left: 15px; }
@@ -60,7 +62,7 @@
         .title-group { text-align: left; }
         h1 { color: var(--header-color); margin: 0; font-size: 1.8rem; }
         p { color: var(--sub-text-color); font-size: 1rem; margin: 5px 0 0; }
-        .header-actions { display: flex; align-items: center; gap: 15px; }
+        .header-actions { display: flex; align-items: center; gap: 10px; }
         
         /* --- ファイル管理 --- */
         .file-manager { display: flex; gap: 8px; align-items: center; }
@@ -68,10 +70,18 @@
 
         .main-content-wrapper { display: flex; flex-grow: 1; min-height: 0; }
         .main-content { display: flex; gap: 0; width: 100%; }
-        .panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        .panel { flex: 1 1 50%; display: flex; flex-direction: column; min-width: 0; min-height: 0; }
         #resizer { width: 10px; cursor: col-resize; background: var(--bg-color); flex-shrink: 0; }
         .panel label { font-weight: bold; margin-bottom: 8px; color: var(--header-color); }
+        
+        /* --- ★★★ ここを修正 ★★★ --- */
+        #editor-container { 
+            flex-grow: 1; 
+            position: relative; 
+            overflow: hidden; /* コンテナのはみ出しを防ぎ、中の要素に正しい幅を伝えさせる */
+        }
         .CodeMirror { height: 100%; border: 1px solid var(--border-color); border-radius: 6px; font-size: 16px; }
+
         .preview-area { height: 100%; padding: 15px; border: 1px solid var(--border-color); border-radius: 6px; overflow-y: auto; background-color: var(--preview-bg); color: var(--text-color); }
         .preview-area:focus { outline: 2px solid var(--button-bg); box-shadow: 0 0 5px var(--button-bg); }
         .editor-footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--sub-text-color); padding: 5px 10px; background-color: var(--preview-bg); border: 1px solid var(--border-color); border-top: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
@@ -87,12 +97,25 @@
         .export-button:hover { background-color: var(--special-button-hover-bg); }
         .file-action-btn { font-size: 12px; padding: 4px 8px; }
 
-        /* --- トースト通知 --- */
+        .view-modes { display: flex; gap: 5px; border: 1px solid var(--border-color); border-radius: 5px; padding: 2px; }
+        .view-modes button { background-color: transparent; color: var(--text-color); padding: 4px 8px; font-size: 16px; border: none; border-radius: 3px; }
+        .view-modes button:hover { background-color: var(--bg-color); }
+        .view-modes button.active { background-color: var(--button-bg); color: white; }
+
         #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
         .toast { background-color: #333; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); transition: opacity 0.3s, transform 0.3s; font-size: 14px; }
         .toast.show { opacity: 1; transform: translateY(0); }
         .toast.success { background-color: #27ae60; }
         .toast.error { background-color: #c0392b; }
+
+        @media (max-width: 800px) {
+            body { flex-direction: column; padding: 10px; height: auto; }
+            #toc-sidebar { width: 100%; height: 150px; border-right: none; border-bottom: 1px solid var(--border-color); margin-bottom: 10px; flex-shrink: 0; }
+            .container { margin-left: 0; padding: 15px; }
+            .main-content { flex-direction: column; min-height: 60vh; }
+            #resizer { width: 100%; height: 10px; cursor: row-resize; }
+            header { flex-direction: column; align-items: flex-start; gap: 15px; }
+        }
     </style>
 </head>
 <body>
@@ -113,6 +136,11 @@
                 </div>
             </div>
             <div class="header-actions">
+                <div class="view-modes">
+                    <button id="view-editor-btn" title="エディタのみ">📝</button>
+                    <button id="view-split-btn" title="分割表示" class="active">🔳</button>
+                    <button id="view-preview-btn" title="プレビューのみ">📄</button>
+                </div>
                 <button id="darkModeToggle">🌙</button>
             </div>
         </header>
@@ -127,7 +155,7 @@
                         </div>
                         <button id="clearButton">クリア</button>
                     </div>
-                    <div id="editor-container" style="flex-grow: 1;"></div>
+                    <div id="editor-container"></div>
                     <div class="editor-footer">
                         <div id="status-info">Markdown</div>
                         <div id="counter">文字数: 0 | 単語数: 0</div>
@@ -143,9 +171,7 @@
 
         <div class="actions">
             <button id="copyButton">見たままコピー</button>
-            <button id="export-md" class="export-button">MD保存</button>
-            <button id="export-html" class="export-button">HTML保存</button>
-            <button id="export-pdf" class="export-button">PDF保存</button>
+            <button id="export-word" class="export-button">Word保存</button>
         </div>
     </div>
     
@@ -157,7 +183,7 @@
         const htmlOutput = getEl('html-output'); const darkModeToggle = getEl('darkModeToggle');
         const clearButton = getEl('clearButton'); const toolbar = document.querySelector('.toolbar');
         const counterElement = getEl('counter'); const copyButton = getEl('copyButton');
-        const exportPdfButton = getEl('export-pdf'); const exportMdButton = getEl('export-md'); const exportHtmlButton = getEl('export-html');
+        const exportWordButton = getEl('export-word');
         const tocList = getEl('toc-list'); const resizer = getEl('resizer');
         const fileSelect = getEl('file-select'); const newFileBtn = getEl('new-file-btn');
         const renameFileBtn = getEl('rename-file-btn'); const deleteFileBtn = getEl('delete-file-btn');
@@ -183,7 +209,6 @@
         };
 
         const initMarked = () => {
-            // タスクリスト (`[ ]`) をサポート
             marked.use({ gfm: true, breaks: true });
         };
 
@@ -203,13 +228,13 @@
             editor.on('change', (cm) => {
                 const content = cm.getValue();
                 const fromPreview = cm.state.fromPreview;
-                if (!fromPreview) { // プレビューからの更新でなければプレビューを更新
+                if (!fromPreview) {
                     updatePreview(content);
                 }
                 updateToc(content);
                 updateCounter(content);
                 saveCurrentFile();
-                cm.state.fromPreview = false; // フラグをリセット
+                cm.state.fromPreview = false;
             });
         };
         
@@ -229,9 +254,11 @@
             let isResizing = false;
             resizer.addEventListener('mousedown', (e) => {
                 isResizing = true;
+                document.body.style.userSelect = 'none';
                 document.addEventListener('mousemove', handleMouseMove);
                 document.addEventListener('mouseup', () => {
                     isResizing = false;
+                    document.body.style.userSelect = '';
                     document.removeEventListener('mousemove', handleMouseMove);
                     editor.refresh();
                 });
@@ -241,25 +268,33 @@
                 if (!isResizing) return;
                 const container = getEl('main-content');
                 const editorPanel = getEl('editor-panel');
-                const previewPanel = getEl('preview-panel');
-                const offset = container.getBoundingClientRect().left;
-                const newEditorWidth = e.clientX - offset - resizer.offsetWidth / 2;
-                const containerWidth = container.offsetWidth;
+                const isColumnLayout = getComputedStyle(container).flexDirection === 'column';
                 
-                const editorPercentage = (newEditorWidth / containerWidth) * 100;
-                editorPanel.style.flex = `${editorPercentage} 0 0`;
-                previewPanel.style.flex = `${100 - editorPercentage} 0 0`;
+                if (isColumnLayout) {
+                    const offset = container.getBoundingClientRect().top;
+                    const newEditorHeight = e.clientY - offset - resizer.offsetHeight / 2;
+                    editorPanel.style.flexBasis = `${newEditorHeight}px`;
+                } else {
+                    const offset = container.getBoundingClientRect().left;
+                    const newEditorWidth = e.clientX - offset - resizer.offsetWidth / 2;
+                    editorPanel.style.flexBasis = `${newEditorWidth}px`;
+                }
             }
         };
 
         // --- ファイル管理 ---
         const initFileManagement = () => {
-            let files = JSON.parse(localStorage.getItem('markdown_files')) || {};
+            let files;
+            try {
+                files = JSON.parse(localStorage.getItem('markdown_files')) || {};
+            } catch(e) {
+                files = {};
+            }
             currentFileId = localStorage.getItem('current_file_id');
 
             if (Object.keys(files).length === 0) {
                 const newId = Date.now().toString();
-                files[newId] = { name: '最初のドキュメント', content: '# ようこそ！\n\n左のエディタか右のプレビューで編集を始めましょう。' };
+                files[newId] = { name: '最初のドキュメント', content: '# ようこそ！\n\n左のエディタか右のプレビューで編集を始めましょう。\n\n## 機能\n- Markdown編集\n- リアルタイムプレビュー\n- 目次\n- スクロール同期' };
                 currentFileId = newId;
                 saveFiles(files);
             }
@@ -288,14 +323,14 @@
             if (files[id]) {
                 currentFileId = id;
                 localStorage.setItem('current_file_id', currentFileId);
-                editor.setValue(files[id].content);
+                setTimeout(() => editor.setValue(files[id].content || ''), 10);
                 fileSelect.value = id;
             }
         };
 
         const saveCurrentFile = () => {
             const files = JSON.parse(localStorage.getItem('markdown_files')) || {};
-            if (files[currentFileId]) {
+            if (currentFileId && files[currentFileId]) {
                 files[currentFileId].content = editor.getValue();
                 saveFiles(files);
             }
@@ -313,9 +348,7 @@
         };
 
         const updatePreview = (content) => {
-            const currentScroll = htmlOutput.scrollTop;
             htmlOutput.innerHTML = marked.parse(content);
-            htmlOutput.scrollTop = currentScroll;
         };
         
         const updateToc = (content) => {
@@ -328,16 +361,17 @@
                     a.textContent = token.text;
                     a.href = '#';
                     a.className = `h${token.depth}`;
-                    a.onclick = (e) => { e.preventDefault(); scrollToHeading(token.text); };
+                    a.onclick = (e) => { e.preventDefault(); scrollToHeading(token.raw); };
                     li.appendChild(a);
                     tocList.appendChild(li);
                 }
             });
         };
 
-        const scrollToHeading = (text) => {
+        const scrollToHeading = (rawHeadingText) => {
+            const lineToFind = rawHeadingText.trim();
             const lines = editor.getValue().split('\n');
-            const lineNum = lines.findIndex(line => line.includes(text));
+            const lineNum = lines.findIndex(line => line.trim() === lineToFind);
             if (lineNum !== -1) {
                 editor.scrollIntoView({line: lineNum, ch: 0}, 50);
                 editor.setCursor(lineNum, 0);
@@ -349,7 +383,7 @@
             const htmlContent = htmlOutput.innerHTML;
             const markdownContent = turndownService.turndown(htmlContent);
             if (markdownContent !== editor.getValue()) {
-                editor.state.fromPreview = true; // プレビューからの更新であることを示すフラグ
+                editor.state.fromPreview = true;
                 editor.setValue(markdownContent);
             }
         }, 500);
@@ -450,8 +484,7 @@
 
             deleteFileBtn.addEventListener('click', () => {
                 const files = JSON.parse(localStorage.getItem('markdown_files'));
-                if (!files[currentFileId]) return;
-                if (Object.keys(files).length <= 1) {
+                if (!files[currentFileId] || Object.keys(files).length <= 1) {
                     showToast('最後のファイルは削除できません', 'error');
                     return;
                 }
@@ -480,49 +513,181 @@
                 }
             });
 
-            exportMdButton.addEventListener('click', () => {
-                const files = JSON.parse(localStorage.getItem('markdown_files'));
-                const filename = (files[currentFileId]?.name || 'document') + '.md';
-                downloadFile(filename, editor.getValue(), 'text/markdown');
-            });
-
-            exportHtmlButton.addEventListener('click', () => {
-                const files = JSON.parse(localStorage.getItem('markdown_files'));
-                const filename = (files[currentFileId]?.name || 'document') + '.html';
-                const htmlContent = `<!DOCTYPE html><html><head><title>${files[currentFileId]?.name || 'Document'}</title><style>body{font-family:sans-serif;}</style></head><body>${htmlOutput.innerHTML}</body></html>`;
-                downloadFile(filename, htmlContent, 'text/html');
-            });
-
-            exportPdfButton.addEventListener('click', async () => {
-                showToast('PDFを生成中です...');
-                exportPdfButton.disabled = true;
-                const { jsPDF } = window.jspdf;
-                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            exportWordButton.addEventListener('click', async () => {
+                showToast('Wordファイルを生成中です...');
+                exportWordButton.disabled = true;
                 try {
-                    const canvas = await html2canvas(htmlOutput, { scale: 2, useCORS: true });
-                    const imgData = canvas.toDataURL('image/png');
-                    const imgProps = pdf.getImageProperties(imgData);
-                    const pdfWidth = pdf.internal.pageSize.getWidth();
-                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                    let heightLeft = pdfHeight, position = 0;
-                    const pageHeight = pdf.internal.pageSize.getHeight();
-                    pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-                    heightLeft -= pageHeight;
-                    while (heightLeft > 0) {
-                        position = heightLeft - pdfHeight;
-                        pdf.addPage();
-                        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-                        heightLeft -= pageHeight;
-                    }
-                    pdf.save((JSON.parse(localStorage.getItem('markdown_files'))[currentFileId]?.name || 'document') + '.pdf');
-                    showToast('PDFの保存が完了しました', 'success');
+                    const content = htmlOutput.innerHTML;
+                    const tempDiv = document.createElement('div');
+                    tempDiv.innerHTML = content;
+
+                    const paragraphs = [];
+                    const processNode = (node) => {
+                        if (node.nodeType === Node.TEXT_NODE) {
+                            if (node.textContent.trim()) {
+                                paragraphs.push(new window.docx.Paragraph({
+                                    children: [new window.docx.TextRun({
+                                        text: node.textContent,
+                                        size: 24
+                                    })]
+                                }));
+                            }
+                            return;
+                        }
+
+                        if (node.nodeType === Node.ELEMENT_NODE) {
+                            switch (node.tagName.toLowerCase()) {
+                                case 'h1':
+                                    paragraphs.push(new window.docx.Paragraph({
+                                        children: [new window.docx.TextRun({
+                                            text: node.textContent,
+                                            bold: true,
+                                            size: 36
+                                        })],
+                                        spacing: { after: 200 }
+                                    }));
+                                    break;
+                                case 'h2':
+                                    paragraphs.push(new window.docx.Paragraph({
+                                        children: [new window.docx.TextRun({
+                                            text: node.textContent,
+                                            bold: true,
+                                            size: 32
+                                        })],
+                                        spacing: { after: 200 }
+                                    }));
+                                    break;
+                                case 'h3':
+                                    paragraphs.push(new window.docx.Paragraph({
+                                        children: [new window.docx.TextRun({
+                                            text: node.textContent,
+                                            bold: true,
+                                            size: 28
+                                        })],
+                                        spacing: { after: 200 }
+                                    }));
+                                    break;
+                                case 'p':
+                                    paragraphs.push(new window.docx.Paragraph({
+                                        children: [new window.docx.TextRun({
+                                            text: node.textContent,
+                                            size: 24
+                                        })],
+                                        spacing: { after: 200 }
+                                    }));
+                                    break;
+                                case 'ul':
+                                case 'ol':
+                                    Array.from(node.children).forEach((li) => {
+                                        paragraphs.push(new window.docx.Paragraph({
+                                            children: [new window.docx.TextRun({
+                                                text: `• ${li.textContent}`,
+                                                size: 24
+                                            })],
+                                            spacing: { after: 100 }
+                                        }));
+                                    });
+                                    break;
+                                case 'blockquote':
+                                    paragraphs.push(new window.docx.Paragraph({
+                                        children: [new window.docx.TextRun({
+                                            text: node.textContent,
+                                            size: 24,
+                                            italics: true
+                                        })],
+                                        spacing: { after: 200 },
+                                        indent: { left: 720 }
+                                    }));
+                                    break;
+                                case 'code':
+                                    paragraphs.push(new window.docx.Paragraph({
+                                        children: [new window.docx.TextRun({
+                                            text: node.textContent,
+                                            size: 24,
+                                            font: { name: 'Courier New' }
+                                        })],
+                                        spacing: { after: 200 }
+                                    }));
+                                    break;
+                                default:
+                                    Array.from(node.childNodes).forEach(processNode);
+                            }
+                        }
+                    };
+
+                    Array.from(tempDiv.childNodes).forEach(processNode);
+
+                    const doc = new window.docx.Document({
+                        sections: [{
+                            properties: {},
+                            children: paragraphs
+                        }]
+                    });
+
+                    const blob = await window.docx.Packer.toBlob(doc);
+                    const files = JSON.parse(localStorage.getItem('markdown_files'));
+                    const filename = (files[currentFileId]?.name || 'document') + '.docx';
+                    saveAs(blob, filename);
+                    showToast('Wordファイルの保存が完了しました', 'success');
                 } catch (e) {
-                    console.error("PDF生成エラー:", e);
-                    showToast('PDFの生成に失敗しました', 'error');
+                    console.error("Word生成エラー:", e);
+                    showToast('Wordファイルの生成に失敗しました', 'error');
                 } finally {
-                    exportPdfButton.disabled = false;
+                    exportWordButton.disabled = false;
                 }
             });
+
+            // --- UI Event Listeners ---
+            const viewEditorBtn = getEl('view-editor-btn');
+            const viewSplitBtn = getEl('view-split-btn');
+            const viewPreviewBtn = getEl('view-preview-btn');
+            const editorPanel = getEl('editor-panel');
+            const previewPanel = getEl('preview-panel');
+
+            const updateViewButtons = (activeMode) => {
+                viewEditorBtn.classList.toggle('active', activeMode === 'editor');
+                viewSplitBtn.classList.toggle('active', activeMode === 'split');
+                viewPreviewBtn.classList.toggle('active', activeMode === 'preview');
+            };
+
+            viewEditorBtn.addEventListener('click', () => {
+                editorPanel.style.display = 'flex'; previewPanel.style.display = 'none'; resizer.style.display = 'none';
+                updateViewButtons('editor'); editor.refresh();
+            });
+            viewSplitBtn.addEventListener('click', () => {
+                editorPanel.style.display = 'flex'; previewPanel.style.display = 'flex'; resizer.style.display = 'flex';
+                updateViewButtons('split'); editor.refresh();
+            });
+            viewPreviewBtn.addEventListener('click', () => {
+                editorPanel.style.display = 'none'; previewPanel.style.display = 'flex'; resizer.style.display = 'none';
+                updateViewButtons('preview');
+            });
+
+            // --- スクロール同期 ---
+            let editorScrolling = false, previewScrolling = false;
+
+            const onEditorScroll = () => {
+                if (previewScrolling) { previewScrolling = false; return; }
+                editorScrolling = true;
+                const scrollInfo = editor.getScrollInfo();
+                const editorHeight = scrollInfo.height - scrollInfo.clientHeight;
+                if (editorHeight <= 0) return;
+                const ratio = scrollInfo.top / editorHeight;
+                htmlOutput.scrollTop = ratio * (htmlOutput.scrollHeight - htmlOutput.clientHeight);
+            };
+
+            const onPreviewScroll = () => {
+                if (editorScrolling) { editorScrolling = false; return; }
+                previewScrolling = true;
+                const previewHeight = htmlOutput.scrollHeight - htmlOutput.clientHeight;
+                if (previewHeight <= 0) return;
+                const ratio = htmlOutput.scrollTop / previewHeight;
+                const scrollInfo = editor.getScrollInfo();
+                editor.scrollTo(null, ratio * (scrollInfo.height - scrollInfo.clientHeight));
+            };
+
+            editor.on('scroll', onEditorScroll);
+            htmlOutput.addEventListener('scroll', onPreviewScroll);
         };
     </script>
 </body>
