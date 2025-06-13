@@ -3,240 +3,305 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Markdownからリッチテキストへ変換＆コピー</title>
-    <!-- marked.jsライブラリをCDNから読み込み -->
+    <title>Pro Markdown Editor & Converter</title>
+
+    <!-- marked.js (Markdown -> HTML) -->
     <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+
+    <!-- CodeMirror (高機能エディタ) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.css">
+    <!-- CodeMirror テーマ (ライトモード用) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/base16-light.min.css">
+    <!-- CodeMirror テーマ (ダークモード用) -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/theme/material-darker.min.css">
+    
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/markdown/markdown.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/display/placeholder.min.js"></script>
+
     <style>
-        /* --- CSSスタイル --- */
+        /* --- 基本スタイルとCSS変数 --- */
+        :root {
+            --bg-color: #f4f7f9;
+            --text-color: #333;
+            --container-bg: #fff;
+            --border-color: #d1d5db;
+            --header-color: #2c3e50;
+            --sub-text-color: #7f8c8d;
+            --preview-bg: #fdfdfd;
+            --button-bg: #3498db;
+            --button-hover-bg: #2980b9;
+            --editor-theme: 'base16-light';
+        }
+
+        body.dark-mode {
+            --bg-color: #2c3e50;
+            --text-color: #ecf0f1;
+            --container-bg: #34495e;
+            --border-color: #4a5568;
+            --header-color: #ecf0f1;
+            --sub-text-color: #bdc3c7;
+            --preview-bg: #2d343b;
+            --button-bg: #e67e22;
+            --button-hover-bg: #d35400;
+            --editor-theme: 'material-darker';
+        }
+        
         body {
             font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
-            background-color: #f4f7f9;
-            color: #333;
+            background-color: var(--bg-color);
+            color: var(--text-color);
             margin: 0;
             padding: 20px;
-            display: flex;
-            flex-direction: column;
-            align-items: center;
+            transition: background-color 0.3s, color 0.3s;
         }
 
         .container {
             width: 90%;
-            max-width: 1200px;
-            background-color: #fff;
+            max-width: 1400px; /* 少し幅を広げる */
+            background-color: var(--container-bg);
             border-radius: 8px;
             box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
             padding: 20px;
+            transition: background-color 0.3s;
         }
 
         header {
-            text-align: center;
-            border-bottom: 1px solid #e0e0e0;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            border-bottom: 1px solid var(--border-color);
             padding-bottom: 15px;
             margin-bottom: 20px;
         }
-
-        h1 {
-            color: #2c3e50;
-            margin: 0;
-        }
         
-        header p {
-            color: #7f8c8d;
-            font-size: 1rem;
-        }
+        header .title-group { text-align: left; }
+        h1 { color: var(--header-color); margin: 0; font-size: 1.8rem; }
+        header p { color: var(--sub-text-color); font-size: 1rem; margin: 5px 0 0; }
 
-        .main-content {
-            display: flex;
-            gap: 20px;
-        }
+        .main-content { display: flex; gap: 20px; }
+        .panel { flex: 1; display: flex; flex-direction: column; }
+        .panel label { font-weight: bold; margin-bottom: 8px; color: var(--header-color); }
 
-        .panel {
-            flex: 1;
-            display: flex;
-            flex-direction: column;
-        }
-
-        .panel label {
-            font-weight: bold;
-            margin-bottom: 8px;
-            color: #34495e;
-        }
-        
-        textarea, .preview-area {
-            width: 100%;
-            height: 60vh;
-            padding: 15px;
-            border: 1px solid #ccc;
+        /* CodeMirrorエディタのスタイル */
+        .CodeMirror {
+            height: 65vh;
+            border: 1px solid var(--border-color);
             border-radius: 6px;
             font-size: 16px;
-            line-height: 1.6;
-            box-sizing: border-box; /* paddingを含めて幅を計算 */
+        }
+        .CodeMirror-placeholder {
+            color: #999 !important;
         }
 
-        textarea {
-            resize: vertical;
-            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        .editor-footer {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            font-size: 12px;
+            color: var(--sub-text-color);
+            padding: 5px 10px;
+            background-color: var(--preview-bg);
+            border: 1px solid var(--border-color);
+            border-top: none;
+            border-bottom-left-radius: 6px;
+            border-bottom-right-radius: 6px;
         }
 
         .preview-area {
-            background-color: #fdfdfd;
-            overflow-y: auto;
-        }
-
-        /* プレビューエリアのスタイル調整 */
-        .preview-area h1, .preview-area h2, .preview-area h3 {
-            margin-top: 1em;
-            margin-bottom: 0.5em;
-            border-bottom: 1px solid #eee;
-            padding-bottom: 0.3em;
-        }
-        .preview-area code {
-            background-color: #ecf0f1;
-            padding: 2px 5px;
-            border-radius: 4px;
-            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
-        }
-        .preview-area pre {
-            background-color: #2d2d2d;
-            color: #f8f8f2;
+            height: calc(65vh + 34px); /* エディタとフッターの高さを合わせる */
             padding: 15px;
+            border: 1px solid var(--border-color);
             border-radius: 6px;
-            overflow-x: auto;
-        }
-        .preview-area pre code {
-            background-color: transparent;
-            padding: 0;
-        }
-        .preview-area blockquote {
-            border-left: 4px solid #bdc3c7;
-            padding-left: 15px;
-            margin-left: 0;
-            color: #7f8c8d;
-        }
-        .preview-area table {
-            border-collapse: collapse;
-            width: 100%;
-            margin: 1em 0;
-        }
-        .preview-area th, .preview-area td {
-            border: 1px solid #ddd;
-            padding: 8px;
-        }
-        .preview-area th {
-            background-color: #f2f2f2;
-        }
-
-
-        .actions {
-            text-align: center;
-            margin-top: 20px;
-        }
-
-        #copyButton {
-            background-color: #3498db;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            font-size: 16px;
-            font-weight: bold;
-            border-radius: 5px;
-            cursor: pointer;
-            transition: background-color 0.3s, transform 0.1s;
-        }
-
-        #copyButton:hover {
-            background-color: #2980b9;
-        }
-
-        #copyButton:active {
-            transform: scale(0.98);
+            overflow-y: auto;
+            background-color: var(--preview-bg);
+            color: var(--text-color);
         }
         
-        #copyButton.copied {
-            background-color: #2ecc71;
+        .actions-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px;}
+        .toolbar button, .actions button, #darkModeToggle {
+            background-color: var(--button-bg); color: white; border: none; padding: 8px 15px; font-size: 14px;
+            border-radius: 5px; cursor: pointer; transition: background-color 0.3s, transform 0.1s;
         }
-
+        .toolbar button:hover, .actions button:hover, #darkModeToggle:hover { background-color: var(--button-hover-bg); }
+        #clearButton { background-color: #e74c3c; }
+        #clearButton:hover { background-color: #c0392b; }
+        #copyButton.copied { background-color: #2ecc71; }
     </style>
 </head>
 <body>
-
     <div class="container">
         <header>
-            <h1>Markdown → リッチテキスト 変換ツール</h1>
-            <p>生成AIの出力を貼り付けて、表示されたままの形式でコピーできます。</p>
+            <div class="title-group">
+                <h1>Pro Markdown Editor</h1>
+                <p>シンタックスハイライト対応。見たままコピーも可能です。</p>
+            </div>
+            <button id="darkModeToggle">🌙 ダークモード</button>
         </header>
         
         <div class="main-content">
             <div class="panel">
-                <label for="markdown-input">1. ここにMarkdownを貼り付け</label>
-                <textarea id="markdown-input" placeholder="**太字** や *斜体*、リストなどをここにペースト..."></textarea>
+                <div class="actions-toolbar">
+                    <div class="toolbar">
+                        <button data-action="bold"><b>B</b></button>
+                        <button data-action="italic"><i>I</i></button>
+                        <button data-action="link">Link</button>
+                        <button data-action="list-ul">- List</button>
+                        <button data-action="list-ol">1. List</button>
+                        <button data-action="code">`Code`</button>
+                    </div>
+                    <button id="clearButton">すべてクリア</button>
+                </div>
+                <!-- CodeMirrorがこのdivをエディタに置き換える -->
+                <div id="editor-container"></div>
+                <div class="editor-footer">
+                    <div id="status-info">Markdown</div>
+                    <div id="counter">文字数: 0 | 単語数: 0</div>
+                </div>
             </div>
             <div class="panel">
-                <label>2. 整形されたプレビュー</label>
+                <label>プレビュー</label>
                 <div id="html-output" class="preview-area"></div>
             </div>
         </div>
 
-        <div class="actions">
-            <button id="copyButton">3. 見たままの形式でコピー</button>
+        <div class="actions" style="text-align: center; margin-top: 20px;">
+            <button id="copyButton" style="padding: 12px 25px; font-size: 16px; font-weight: bold;">見たままの形式でコピー</button>
         </div>
     </div>
 
     <script>
-        // --- JavaScriptロジック ---
-
-        // 1. 必要なHTML要素を取得
-        const markdownInput = document.getElementById('markdown-input');
+        // --- 要素取得 ---
         const htmlOutput = document.getElementById('html-output');
         const copyButton = document.getElementById('copyButton');
+        const darkModeToggle = document.getElementById('darkModeToggle');
+        const clearButton = document.getElementById('clearButton');
+        const toolbar = document.querySelector('.toolbar');
+        const counterElement = document.getElementById('counter');
 
-        // 2. 入力エリアのテキストが変更されたら、リアルタイムでプレビューを更新する
-        markdownInput.addEventListener('input', () => {
-            const markdownText = markdownInput.value;
-            // marked.jsを使ってMarkdownをHTMLに変換
-            const htmlText = marked.parse(markdownText);
-            // プレビューエリアにHTMLとして表示
-            htmlOutput.innerHTML = htmlText;
-        });
+        let editor; // CodeMirrorインスタンスを保持する変数
+
+        // --- 関数定義 ---
+        const updatePreview = (content) => {
+            htmlOutput.innerHTML = marked.parse(content);
+        };
+
+        const updateCounter = (content) => {
+            const charCount = content.length;
+            const wordCount = content.split(/\s+/).filter(Boolean).length;
+            counterElement.textContent = `文字数: ${charCount} | 単語数: ${wordCount}`;
+        };
+
+        const saveContent = (content) => {
+            localStorage.setItem('markdownContent', content);
+        };
+
+        const applyStyle = (action) => {
+            const selection = editor.getSelection();
+            let replacement = '';
+            switch (action) {
+                case 'bold': replacement = `**${selection}**`; break;
+                case 'italic': replacement = `*${selection}*`; break;
+                case 'link':
+                    const url = prompt('リンク先のURLを入力してください:', 'https://');
+                    if (url) replacement = `[${selection || 'リンクテキスト'}](${url})`;
+                    else return;
+                    break;
+                case 'list-ul': replacement = `- ${selection}`; break;
+                case 'list-ol': replacement = `1. ${selection}`; break;
+                case 'code': replacement = `\`${selection}\``; break;
+            }
+            editor.replaceSelection(replacement, 'end');
+            editor.focus();
+        };
         
-        // 3. コピーボタンがクリックされたときの処理
+        const initEditor = (isDark) => {
+            const container = document.getElementById('editor-container');
+            container.innerHTML = ''; // 既存のエディタをクリア
+
+            editor = CodeMirror(container, {
+                value: localStorage.getItem('markdownContent') || '',
+                mode: 'markdown',
+                theme: isDark ? 'material-darker' : 'base16-light',
+                lineNumbers: true,
+                lineWrapping: true,
+                autofocus: true,
+                placeholder: '# ようこそ！\nここにMarkdownを入力してください...'
+            });
+
+            editor.on('change', (cm) => {
+                const content = cm.getValue();
+                updatePreview(content);
+                updateCounter(content);
+                saveContent(content);
+            });
+
+            // 初期表示の更新
+            const initialContent = editor.getValue();
+            updatePreview(initialContent);
+            updateCounter(initialContent);
+        };
+
+        // --- イベントリスナー ---
+        clearButton.addEventListener('click', () => {
+            if (confirm('入力内容をすべて消去しますか？')) {
+                editor.setValue('');
+                editor.focus();
+            }
+        });
+
+        toolbar.addEventListener('click', (e) => {
+            if (e.target.tagName === 'BUTTON') {
+                const action = e.target.dataset.action;
+                if (action) applyStyle(action);
+            }
+        });
+
+        darkModeToggle.addEventListener('click', () => {
+            const isCurrentlyDark = document.body.classList.contains('dark-mode');
+            document.body.classList.toggle('dark-mode');
+            const isNowDark = !isCurrentlyDark;
+
+            localStorage.setItem('darkMode', isNowDark);
+            darkModeToggle.textContent = isNowDark ? '☀️ ライトモード' : '🌙 ダークモード';
+            
+            // エディタのテーマを動的に変更
+            editor.setOption('theme', isNowDark ? 'material-darker' : 'base16-light');
+        });
+
         copyButton.addEventListener('click', async () => {
             try {
-                // プレビューエリアのHTMLコンテンツを取得
                 const htmlToCopy = htmlOutput.innerHTML;
-                // プレーンテキスト版も取得（HTMLを貼り付けられない環境向けの予備）
                 const textToCopy = htmlOutput.innerText;
-
-                // Clipboard APIを使ってリッチテキスト(HTML)をコピー
-                // Blobオブジェクトを作成してクリップボードに書き込む
                 const htmlBlob = new Blob([htmlToCopy], { type: 'text/html' });
                 const textBlob = new Blob([textToCopy], { type: 'text/plain' });
-
                 const clipboardItem = new ClipboardItem({
                     'text/html': htmlBlob,
                     'text/plain': textBlob,
                 });
-
                 await navigator.clipboard.write([clipboardItem]);
-
-                // ユーザーにコピー完了を通知
                 const originalText = copyButton.textContent;
                 copyButton.textContent = 'コピーしました！';
                 copyButton.classList.add('copied');
-                
                 setTimeout(() => {
                     copyButton.textContent = originalText;
                     copyButton.classList.remove('copied');
-                }, 2000); // 2秒後にボタンの表示を元に戻す
-
+                }, 2000);
             } catch (err) {
                 console.error('クリップボードへのコピーに失敗しました: ', err);
-                alert('コピーに失敗しました。お使いのブラウザが対応していない可能性があります。');
+                alert('コピーに失敗しました。');
             }
         });
 
-        // 初期表示用に空の状態で一度変換を実行
-        htmlOutput.innerHTML = marked.parse(markdownInput.placeholder);
+        // --- 初期化処理 ---
+        document.addEventListener('DOMContentLoaded', () => {
+            const savedDarkMode = localStorage.getItem('darkMode') === 'true';
+            if (savedDarkMode) {
+                document.body.classList.add('dark-mode');
+                darkModeToggle.textContent = '☀️ ライトモード';
+            }
+            initEditor(savedDarkMode);
+        });
     </script>
 </body>
 </html>
