@@ -1,0 +1,242 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Markdownからリッチテキストへ変換＆コピー</title>
+    <!-- marked.jsライブラリをCDNから読み込み -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <style>
+        /* --- CSSスタイル --- */
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif;
+            background-color: #f4f7f9;
+            color: #333;
+            margin: 0;
+            padding: 20px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+        }
+
+        .container {
+            width: 90%;
+            max-width: 1200px;
+            background-color: #fff;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            padding: 20px;
+        }
+
+        header {
+            text-align: center;
+            border-bottom: 1px solid #e0e0e0;
+            padding-bottom: 15px;
+            margin-bottom: 20px;
+        }
+
+        h1 {
+            color: #2c3e50;
+            margin: 0;
+        }
+        
+        header p {
+            color: #7f8c8d;
+            font-size: 1rem;
+        }
+
+        .main-content {
+            display: flex;
+            gap: 20px;
+        }
+
+        .panel {
+            flex: 1;
+            display: flex;
+            flex-direction: column;
+        }
+
+        .panel label {
+            font-weight: bold;
+            margin-bottom: 8px;
+            color: #34495e;
+        }
+        
+        textarea, .preview-area {
+            width: 100%;
+            height: 60vh;
+            padding: 15px;
+            border: 1px solid #ccc;
+            border-radius: 6px;
+            font-size: 16px;
+            line-height: 1.6;
+            box-sizing: border-box; /* paddingを含めて幅を計算 */
+        }
+
+        textarea {
+            resize: vertical;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+
+        .preview-area {
+            background-color: #fdfdfd;
+            overflow-y: auto;
+        }
+
+        /* プレビューエリアのスタイル調整 */
+        .preview-area h1, .preview-area h2, .preview-area h3 {
+            margin-top: 1em;
+            margin-bottom: 0.5em;
+            border-bottom: 1px solid #eee;
+            padding-bottom: 0.3em;
+        }
+        .preview-area code {
+            background-color: #ecf0f1;
+            padding: 2px 5px;
+            border-radius: 4px;
+            font-family: 'Menlo', 'Monaco', 'Courier New', monospace;
+        }
+        .preview-area pre {
+            background-color: #2d2d2d;
+            color: #f8f8f2;
+            padding: 15px;
+            border-radius: 6px;
+            overflow-x: auto;
+        }
+        .preview-area pre code {
+            background-color: transparent;
+            padding: 0;
+        }
+        .preview-area blockquote {
+            border-left: 4px solid #bdc3c7;
+            padding-left: 15px;
+            margin-left: 0;
+            color: #7f8c8d;
+        }
+        .preview-area table {
+            border-collapse: collapse;
+            width: 100%;
+            margin: 1em 0;
+        }
+        .preview-area th, .preview-area td {
+            border: 1px solid #ddd;
+            padding: 8px;
+        }
+        .preview-area th {
+            background-color: #f2f2f2;
+        }
+
+
+        .actions {
+            text-align: center;
+            margin-top: 20px;
+        }
+
+        #copyButton {
+            background-color: #3498db;
+            color: white;
+            border: none;
+            padding: 12px 25px;
+            font-size: 16px;
+            font-weight: bold;
+            border-radius: 5px;
+            cursor: pointer;
+            transition: background-color 0.3s, transform 0.1s;
+        }
+
+        #copyButton:hover {
+            background-color: #2980b9;
+        }
+
+        #copyButton:active {
+            transform: scale(0.98);
+        }
+        
+        #copyButton.copied {
+            background-color: #2ecc71;
+        }
+
+    </style>
+</head>
+<body>
+
+    <div class="container">
+        <header>
+            <h1>Markdown → リッチテキスト 変換ツール</h1>
+            <p>生成AIの出力を貼り付けて、表示されたままの形式でコピーできます。</p>
+        </header>
+        
+        <div class="main-content">
+            <div class="panel">
+                <label for="markdown-input">1. ここにMarkdownを貼り付け</label>
+                <textarea id="markdown-input" placeholder="**太字** や *斜体*、リストなどをここにペースト..."></textarea>
+            </div>
+            <div class="panel">
+                <label>2. 整形されたプレビュー</label>
+                <div id="html-output" class="preview-area"></div>
+            </div>
+        </div>
+
+        <div class="actions">
+            <button id="copyButton">3. 見たままの形式でコピー</button>
+        </div>
+    </div>
+
+    <script>
+        // --- JavaScriptロジック ---
+
+        // 1. 必要なHTML要素を取得
+        const markdownInput = document.getElementById('markdown-input');
+        const htmlOutput = document.getElementById('html-output');
+        const copyButton = document.getElementById('copyButton');
+
+        // 2. 入力エリアのテキストが変更されたら、リアルタイムでプレビューを更新する
+        markdownInput.addEventListener('input', () => {
+            const markdownText = markdownInput.value;
+            // marked.jsを使ってMarkdownをHTMLに変換
+            const htmlText = marked.parse(markdownText);
+            // プレビューエリアにHTMLとして表示
+            htmlOutput.innerHTML = htmlText;
+        });
+        
+        // 3. コピーボタンがクリックされたときの処理
+        copyButton.addEventListener('click', async () => {
+            try {
+                // プレビューエリアのHTMLコンテンツを取得
+                const htmlToCopy = htmlOutput.innerHTML;
+                // プレーンテキスト版も取得（HTMLを貼り付けられない環境向けの予備）
+                const textToCopy = htmlOutput.innerText;
+
+                // Clipboard APIを使ってリッチテキスト(HTML)をコピー
+                // Blobオブジェクトを作成してクリップボードに書き込む
+                const htmlBlob = new Blob([htmlToCopy], { type: 'text/html' });
+                const textBlob = new Blob([textToCopy], { type: 'text/plain' });
+
+                const clipboardItem = new ClipboardItem({
+                    'text/html': htmlBlob,
+                    'text/plain': textBlob,
+                });
+
+                await navigator.clipboard.write([clipboardItem]);
+
+                // ユーザーにコピー完了を通知
+                const originalText = copyButton.textContent;
+                copyButton.textContent = 'コピーしました！';
+                copyButton.classList.add('copied');
+                
+                setTimeout(() => {
+                    copyButton.textContent = originalText;
+                    copyButton.classList.remove('copied');
+                }, 2000); // 2秒後にボタンの表示を元に戻す
+
+            } catch (err) {
+                console.error('クリップボードへのコピーに失敗しました: ', err);
+                alert('コピーに失敗しました。お使いのブラウザが対応していない可能性があります。');
+            }
+        });
+
+        // 初期表示用に空の状態で一度変換を実行
+        htmlOutput.innerHTML = marked.parse(markdownInput.placeholder);
+    </script>
+</body>
+</html>
