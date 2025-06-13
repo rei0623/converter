@@ -15,6 +15,7 @@
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/codemirror.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/mode/markdown/markdown.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/display/placeholder.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/codemirror/5.65.15/addon/edit/continuelist.min.js"></script>
 
     <!-- 3. エクスポート & WYSIWYG用ライブラリ -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
@@ -24,7 +25,6 @@
     <!-- 4. プレゼンテーション用ライブラリ (Marpit) -->
     <script src="https://cdn.jsdelivr.net/npm/@marp-team/marpit/dist/marpit.browser.js"></script>
 
-
     <style>
         /* --- 基本スタイルとCSS変数 --- */
         :root {
@@ -32,30 +32,51 @@
             --header-color: #2c3e50; --sub-text-color: #7f8c8d; --preview-bg: #fdfdfd;
             --button-bg: #3498db; --button-hover-bg: #2980b9; --editor-theme: 'base16-light';
             --special-button-bg: #16a085; --special-button-hover-bg: #117a65;
+            --sidebar-bg: #eef2f5; --sidebar-width: 250px;
         }
         body.dark-mode {
             --bg-color: #2c3e50; --text-color: #ecf0f1; --container-bg: #34495e; --border-color: #4a5568;
             --header-color: #ecf0f1; --sub-text-color: #bdc3c7; --preview-bg: #2d343b;
             --button-bg: #e67e22; --button-hover-bg: #d35400; --editor-theme: 'material-darker';
             --special-button-bg: #27ae60; --special-button-hover-bg: #229954;
+            --sidebar-bg: #283747;
         }
         
-        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; transition: background-color 0.3s, color 0.3s; }
-        .container { width: 90%; max-width: 1400px; background-color: var(--container-bg); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; transition: background-color 0.3s; }
+        body { font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif; background-color: var(--bg-color); color: var(--text-color); margin: 0; padding: 20px; transition: background-color 0.3s, color 0.3s; display: flex; height: calc(100vh - 40px); }
+        
+        /* --- サイドバー (目次) --- */
+        #toc-sidebar { width: var(--sidebar-width); background-color: var(--sidebar-bg); padding: 15px; overflow-y: auto; transition: background-color 0.3s; border-right: 1px solid var(--border-color); flex-shrink: 0; }
+        #toc-sidebar h3 { margin-top: 0; color: var(--header-color); border-bottom: 1px solid var(--border-color); padding-bottom: 10px; }
+        #toc-list { list-style: none; padding-left: 0; }
+        #toc-list li { margin-bottom: 8px; }
+        #toc-list a { color: var(--sub-text-color); text-decoration: none; transition: color 0.2s; font-size: 14px; }
+        #toc-list a:hover { color: var(--header-color); }
+        #toc-list .h1 { font-weight: bold; }
+        #toc-list .h2 { padding-left: 15px; }
+        #toc-list .h3 { padding-left: 30px; font-size: 13px; }
+        
+        .container { flex-grow: 1; display: flex; flex-direction: column; background-color: var(--container-bg); border-radius: 8px; box-shadow: 0 4px 12px rgba(0,0,0,0.1); padding: 20px; transition: background-color 0.3s; margin-left: 20px; }
         header { display: flex; justify-content: space-between; align-items: center; border-bottom: 1px solid var(--border-color); padding-bottom: 15px; margin-bottom: 20px; }
         .title-group { text-align: left; }
         h1 { color: var(--header-color); margin: 0; font-size: 1.8rem; }
         p { color: var(--sub-text-color); font-size: 1rem; margin: 5px 0 0; }
         .header-actions { display: flex; align-items: center; gap: 15px; }
-        .main-content { display: flex; gap: 20px; }
-        .panel { flex: 1; display: flex; flex-direction: column; }
+        
+        /* --- ファイル管理 --- */
+        .file-manager { display: flex; gap: 8px; align-items: center; }
+        #file-select { font-size: 14px; padding: 5px 8px; border-radius: 4px; border: 1px solid var(--border-color); background-color: var(--preview-bg); color: var(--text-color); }
+
+        .main-content-wrapper { display: flex; flex-grow: 1; min-height: 0; }
+        .main-content { display: flex; gap: 0; width: 100%; }
+        .panel { flex: 1; display: flex; flex-direction: column; min-width: 0; }
+        #resizer { width: 10px; cursor: col-resize; background: var(--bg-color); flex-shrink: 0; }
         .panel label { font-weight: bold; margin-bottom: 8px; color: var(--header-color); }
-        .CodeMirror { height: 65vh; border: 1px solid var(--border-color); border-radius: 6px; font-size: 16px; }
-        .preview-area { height: calc(65vh + 34px); padding: 15px; border: 1px solid var(--border-color); border-radius: 6px; overflow-y: auto; background-color: var(--preview-bg); color: var(--text-color); }
+        .CodeMirror { height: 100%; border: 1px solid var(--border-color); border-radius: 6px; font-size: 16px; }
+        .preview-area { height: 100%; padding: 15px; border: 1px solid var(--border-color); border-radius: 6px; overflow-y: auto; background-color: var(--preview-bg); color: var(--text-color); }
         .preview-area:focus { outline: 2px solid var(--button-bg); box-shadow: 0 0 5px var(--button-bg); }
         .editor-footer { display: flex; justify-content: space-between; align-items: center; font-size: 12px; color: var(--sub-text-color); padding: 5px 10px; background-color: var(--preview-bg); border: 1px solid var(--border-color); border-top: none; border-bottom-left-radius: 6px; border-bottom-right-radius: 6px; }
         .actions-toolbar { display: flex; justify-content: space-between; align-items: center; margin-bottom: 10px; flex-wrap: wrap; gap: 10px; }
-        .actions { text-align: center; margin-top: 20px; display: flex; gap: 10px; justify-content: center; }
+        .actions { text-align: center; margin-top: 20px; display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; }
         
         button { background-color: var(--button-bg); color: white; border: none; padding: 8px 15px; font-size: 14px; border-radius: 5px; cursor: pointer; transition: background-color 0.3s, transform 0.1s; font-weight: bold; }
         button:hover { background-color: var(--button-hover-bg); }
@@ -64,136 +85,279 @@
         #copyButton.copied, .export-button.processing { background-color: #2ecc71; }
         .export-button { background-color: var(--special-button-bg); }
         .export-button:hover { background-color: var(--special-button-hover-bg); }
+        .file-action-btn { font-size: 12px; padding: 4px 8px; }
 
-        /* プレゼンテーションモード用スタイル */
-        #presentation-container { display: none; position: fixed; top: 0; left: 0; width: 100%; height: 100%; background: var(--bg-color); z-index: 1000; overflow: auto; }
-        .marp-root { width: 100%; height: 100%; }
-        /* Marpitが生成するスライド用のスタイル */
-        .marp-root svg { width: 100%; height: 100%; }
-
-        /* プレゼンテーションモード切り替えスイッチ */
-        .toggle-switch { position: relative; display: inline-block; width: 60px; height: 34px; }
-        .toggle-switch input { opacity: 0; width: 0; height: 0; }
-        .slider { position: absolute; cursor: pointer; top: 0; left: 0; right: 0; bottom: 0; background-color: #ccc; transition: .4s; border-radius: 34px; }
-        .slider:before { position: absolute; content: ""; height: 26px; width: 26px; left: 4px; bottom: 4px; background-color: white; transition: .4s; border-radius: 50%; }
-        input:checked + .slider { background-color: var(--special-button-bg); }
-        input:checked + .slider:before { transform: translateX(26px); }
+        /* --- トースト通知 --- */
+        #toast-container { position: fixed; bottom: 20px; right: 20px; z-index: 9999; display: flex; flex-direction: column; gap: 10px; }
+        .toast { background-color: #333; color: white; padding: 12px 20px; border-radius: 6px; box-shadow: 0 2px 10px rgba(0,0,0,0.2); opacity: 0; transform: translateY(20px); transition: opacity 0.3s, transform 0.3s; font-size: 14px; }
+        .toast.show { opacity: 1; transform: translateY(0); }
+        .toast.success { background-color: #27ae60; }
+        .toast.error { background-color: #c0392b; }
     </style>
 </head>
 <body>
+    <aside id="toc-sidebar">
+        <h3>目次</h3>
+        <ul id="toc-list"></ul>
+    </aside>
+
     <div class="container" id="editor-workspace">
         <header>
             <div class="title-group">
                 <h1>Ultimate Markdown Workspace</h1>
-                <p>書く、見せる、エクスポートする。すべてをこの場所で。</p>
+                <div class="file-manager">
+                    <select id="file-select"></select>
+                    <button id="new-file-btn" class="file-action-btn">+</button>
+                    <button id="rename-file-btn" class="file-action-btn">Rename</button>
+                    <button id="delete-file-btn" class="file-action-btn">✕</button>
+                </div>
             </div>
             <div class="header-actions">
                 <button id="darkModeToggle">🌙</button>
             </div>
         </header>
-        
-        <div class="main-content">
-            <div class="panel">
-                <div class="actions-toolbar">
-                    <div class="toolbar">
-                        <button data-action="bold">B</button> <button data-action="italic">I</button> <button data-action="link">Link</button>
-                        <button data-action="list-ul">- List</button> <button data-action="list-ol">1. List</button> <button data-action="code">`Code`</button>
+
+        <div class="main-content-wrapper">
+            <div class="main-content" id="main-content">
+                <div class="panel" id="editor-panel">
+                    <div class="actions-toolbar">
+                        <div class="toolbar">
+                            <button data-action="bold">B</button> <button data-action="italic">I</button> <button data-action="link">Link</button>
+                            <button data-action="list-ul">- List</button> <button data-action="list-ol">1. List</button> <button data-action="code">`Code`</button>
+                        </div>
+                        <button id="clearButton">クリア</button>
                     </div>
-                    <button id="clearButton">クリア</button>
+                    <div id="editor-container" style="flex-grow: 1;"></div>
+                    <div class="editor-footer">
+                        <div id="status-info">Markdown</div>
+                        <div id="counter">文字数: 0 | 単語数: 0</div>
+                    </div>
                 </div>
-                <div id="editor-container"></div>
-                <div class="editor-footer">
-                    <div id="status-info">Markdown</div>
-                    <div id="counter">文字数: 0 | 単語数: 0</div>
+                <div id="resizer"></div>
+                <div class="panel" id="preview-panel">
+                    <label>プレビュー (直接編集できます)</label>
+                    <div id="html-output" class="preview-area" contenteditable="true"></div>
                 </div>
-            </div>
-            <div class="panel">
-                <label>プレビュー (直接編集できます)</label>
-                <div id="html-output" class="preview-area" contenteditable="true"></div>
             </div>
         </div>
 
         <div class="actions">
             <button id="copyButton">見たままコピー</button>
-            <button id="export-pdf" class="export-button">PDFで保存</button>
+            <button id="export-md" class="export-button">MD保存</button>
+            <button id="export-html" class="export-button">HTML保存</button>
+            <button id="export-pdf" class="export-button">PDF保存</button>
         </div>
     </div>
-
-    <!-- プレゼンテーション表示用コンテナ -->
-    <div id="presentation-container"></div>
-
-    <!-- サイドバー -->
-    <div class="sidebar">
-        <i class="sidebar-icon fas fa-pen-to-square active" data-panel="editor" title="エディタ"></i>
-        <i class="sidebar-icon fas fa-robot" data-panel="ai" title="AIアシスタント"></i>
-        <i class="sidebar-icon fas fa-file-export" data-panel="export" title="エクスポート"></i>
-        <i class="sidebar-icon fas fa-cog" data-panel="settings" title="設定"></i>
-    </div>
+    
+    <div id="toast-container"></div>
 
     <script>
         // --- 要素取得 ---
-        const htmlOutput = document.getElementById('html-output');
-        const darkModeToggle = document.getElementById('darkModeToggle');
-        const clearButton = document.getElementById('clearButton');
-        const toolbar = document.querySelector('.toolbar');
-        const counterElement = document.getElementById('counter');
-        const copyButton = document.getElementById('copyButton');
-        const exportPdfButton = document.getElementById('export-pdf');
-        const presentationToggle = document.getElementById('presentation-toggle');
-        const editorWorkspace = document.getElementById('editor-workspace');
-        const presentationContainer = document.getElementById('presentation-container');
+        const getEl = (id) => document.getElementById(id);
+        const htmlOutput = getEl('html-output'); const darkModeToggle = getEl('darkModeToggle');
+        const clearButton = getEl('clearButton'); const toolbar = document.querySelector('.toolbar');
+        const counterElement = getEl('counter'); const copyButton = getEl('copyButton');
+        const exportPdfButton = getEl('export-pdf'); const exportMdButton = getEl('export-md'); const exportHtmlButton = getEl('export-html');
+        const tocList = getEl('toc-list'); const resizer = getEl('resizer');
+        const fileSelect = getEl('file-select'); const newFileBtn = getEl('new-file-btn');
+        const renameFileBtn = getEl('rename-file-btn'); const deleteFileBtn = getEl('delete-file-btn');
 
-        let editor; // CodeMirrorインスタンス
-        let turndownService; // Turndown.jsのインスタンス
+        let editor; let turndownService; let currentFileId;
         
         // --- 初期化 ---
         document.addEventListener('DOMContentLoaded', () => {
-            const savedDarkMode = localStorage.getItem('darkMode') === 'true';
-            if (savedDarkMode) {
-                document.body.classList.add('dark-mode');
-                darkModeToggle.textContent = '☀️';
-            } else {
-                darkModeToggle.textContent = '🌙';
-            }
-            initEditor(savedDarkMode);
-            // Turndownサービスを初期化
-            turndownService = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
-            addPreviewEditorListener();
+            initDarkMode();
+            initMarked();
+            initEditor(localStorage.getItem('darkMode') === 'true');
+            initTurndown();
+            initFileManagement();
+            initResize();
+            addEventListeners();
+            showToast('ワークスペースへようこそ！', 'success');
         });
 
+        const initDarkMode = () => {
+            const isDark = localStorage.getItem('darkMode') === 'true';
+            document.body.classList.toggle('dark-mode', isDark);
+            darkModeToggle.textContent = isDark ? '☀️' : '🌙';
+        };
+
+        const initMarked = () => {
+            // タスクリスト (`[ ]`) をサポート
+            marked.use({ gfm: true, breaks: true });
+        };
+
         const initEditor = (isDark) => {
-            const container = document.getElementById('editor-container');
-            container.innerHTML = '';
+            const container = getEl('editor-container');
+            const keyMap = {
+                "Cmd-B": "bold", "Ctrl-B": "bold",
+                "Cmd-I": "italic", "Ctrl-I": "italic",
+            };
             editor = CodeMirror(container, {
-                value: localStorage.getItem('markdownContent') || '# Welcome to Ultimate Markdown Workspace!\n\nStart writing here, or edit the preview on the right.',
                 mode: 'markdown',
                 theme: isDark ? 'material-darker' : 'base16-light',
-                lineNumbers: true,
-                lineWrapping: true,
+                lineNumbers: true, lineWrapping: true,
+                extraKeys: { ...keyMap, "Enter": "newlineAndIndentContinueMarkdownList" }
             });
+
             editor.on('change', (cm) => {
                 const content = cm.getValue();
-                updatePreview(content);
+                const fromPreview = cm.state.fromPreview;
+                if (!fromPreview) { // プレビューからの更新でなければプレビューを更新
+                    updatePreview(content);
+                }
+                updateToc(content);
                 updateCounter(content);
-                saveContent(content);
+                saveCurrentFile();
+                cm.state.fromPreview = false; // フラグをリセット
             });
-            const initialContent = editor.getValue();
-            updatePreview(initialContent);
-            updateCounter(initialContent);
         };
         
-        // --- 関数定義 ---
+        const initTurndown = () => {
+            turndownService = new TurndownService({ headingStyle: 'atx', codeBlockStyle: 'fenced' });
+            turndownService.addRule('taskListItem', {
+                filter: function (node) {
+                    return node.type === 'checkbox' && node.parentNode.nodeName === 'LI';
+                },
+                replacement: function (content, node) {
+                    return (node.checked ? '[x] ' : '[ ] ') + content;
+                }
+            });
+        };
+
+        const initResize = () => {
+            let isResizing = false;
+            resizer.addEventListener('mousedown', (e) => {
+                isResizing = true;
+                document.addEventListener('mousemove', handleMouseMove);
+                document.addEventListener('mouseup', () => {
+                    isResizing = false;
+                    document.removeEventListener('mousemove', handleMouseMove);
+                    editor.refresh();
+                });
+            });
+
+            function handleMouseMove(e) {
+                if (!isResizing) return;
+                const container = getEl('main-content');
+                const editorPanel = getEl('editor-panel');
+                const previewPanel = getEl('preview-panel');
+                const offset = container.getBoundingClientRect().left;
+                const newEditorWidth = e.clientX - offset - resizer.offsetWidth / 2;
+                const containerWidth = container.offsetWidth;
+                
+                const editorPercentage = (newEditorWidth / containerWidth) * 100;
+                editorPanel.style.flex = `${editorPercentage} 0 0`;
+                previewPanel.style.flex = `${100 - editorPercentage} 0 0`;
+            }
+        };
+
+        // --- ファイル管理 ---
+        const initFileManagement = () => {
+            let files = JSON.parse(localStorage.getItem('markdown_files')) || {};
+            currentFileId = localStorage.getItem('current_file_id');
+
+            if (Object.keys(files).length === 0) {
+                const newId = Date.now().toString();
+                files[newId] = { name: '最初のドキュメント', content: '# ようこそ！\n\n左のエディタか右のプレビューで編集を始めましょう。' };
+                currentFileId = newId;
+                saveFiles(files);
+            }
+            if (!currentFileId || !files[currentFileId]) {
+                currentFileId = Object.keys(files)[0];
+            }
+            localStorage.setItem('current_file_id', currentFileId);
+            populateFileSelect();
+            loadFile(currentFileId);
+        };
+
+        const populateFileSelect = () => {
+            const files = JSON.parse(localStorage.getItem('markdown_files')) || {};
+            fileSelect.innerHTML = '';
+            for (const id in files) {
+                const option = document.createElement('option');
+                option.value = id;
+                option.textContent = files[id].name;
+                option.selected = id === currentFileId;
+                fileSelect.appendChild(option);
+            }
+        };
+
+        const loadFile = (id) => {
+            const files = JSON.parse(localStorage.getItem('markdown_files')) || {};
+            if (files[id]) {
+                currentFileId = id;
+                localStorage.setItem('current_file_id', currentFileId);
+                editor.setValue(files[id].content);
+                fileSelect.value = id;
+            }
+        };
+
+        const saveCurrentFile = () => {
+            const files = JSON.parse(localStorage.getItem('markdown_files')) || {};
+            if (files[currentFileId]) {
+                files[currentFileId].content = editor.getValue();
+                saveFiles(files);
+            }
+        };
+
+        const saveFiles = (files) => localStorage.setItem('markdown_files', JSON.stringify(files));
+
+        // --- 機能関数 ---
+        const debounce = (func, delay) => {
+            let timeout;
+            return (...args) => {
+                clearTimeout(timeout);
+                timeout = setTimeout(() => func.apply(this, args), delay);
+            };
+        };
+
         const updatePreview = (content) => {
-            const currentScroll = htmlOutput.scrollTop; // スクロール位置を保持
+            const currentScroll = htmlOutput.scrollTop;
             htmlOutput.innerHTML = marked.parse(content);
-            htmlOutput.scrollTop = currentScroll; // スクロール位置を復元
+            htmlOutput.scrollTop = currentScroll;
         };
+        
+        const updateToc = (content) => {
+            tocList.innerHTML = '';
+            const tokens = marked.lexer(content);
+            tokens.forEach(token => {
+                if (token.type === 'heading') {
+                    const li = document.createElement('li');
+                    const a = document.createElement('a');
+                    a.textContent = token.text;
+                    a.href = '#';
+                    a.className = `h${token.depth}`;
+                    a.onclick = (e) => { e.preventDefault(); scrollToHeading(token.text); };
+                    li.appendChild(a);
+                    tocList.appendChild(li);
+                }
+            });
+        };
+
+        const scrollToHeading = (text) => {
+            const lines = editor.getValue().split('\n');
+            const lineNum = lines.findIndex(line => line.includes(text));
+            if (lineNum !== -1) {
+                editor.scrollIntoView({line: lineNum, ch: 0}, 50);
+                editor.setCursor(lineNum, 0);
+                editor.focus();
+            }
+        };
+
+        const updateFromPreview = debounce(() => {
+            const htmlContent = htmlOutput.innerHTML;
+            const markdownContent = turndownService.turndown(htmlContent);
+            if (markdownContent !== editor.getValue()) {
+                editor.state.fromPreview = true; // プレビューからの更新であることを示すフラグ
+                editor.setValue(markdownContent);
+            }
+        }, 500);
+
         const updateCounter = (content) => {
-            const charCount = content.length;
-            const wordCount = content.split(/\s+/).filter(Boolean).length;
-            counterElement.textContent = `文字数: ${charCount} | 単語数: ${wordCount}`;
+            counterElement.textContent = `文字数: ${content.length} | 単語数: ${content.split(/\s+/).filter(Boolean).length}`;
         };
-        const saveContent = (content) => { localStorage.setItem('markdownContent', content); };
+
         const applyStyle = (action) => {
             const selection = editor.getSelection();
             let replacement = '';
@@ -201,142 +365,165 @@
                 case 'bold': replacement = `**${selection}**`; break;
                 case 'italic': replacement = `*${selection}*`; break;
                 case 'link':
-                    const url = prompt('リンク先のURLを入力してください:', 'https://');
-                    if (url) replacement = `[${selection || 'リンクテキスト'}](${url})`;
-                    else return;
+                    const url = prompt('リンク先のURL:', 'https://');
+                    if (url) replacement = `[${selection || 'リンク'}](${url})`; else return;
                     break;
-                case 'list-ul': replacement = `- ${selection}`; break;
-                case 'list-ol': replacement = `1. ${selection}`; break;
+                case 'list-ul': editor.execCommand("insertUnorderedList"); return;
+                case 'list-ol': editor.execCommand("insertOrderedList"); return;
                 case 'code': replacement = `\`${selection}\``; break;
+                default: if (editor.getOption('extraKeys')[action]) editor.execCommand(action); return;
             }
             editor.replaceSelection(replacement, 'end');
             editor.focus();
         };
-
-        // --- プレビュー編集機能 ---
-        const addPreviewEditorListener = () => {
-            // プレビューエリアからフォーカスが外れた時にエディタを更新
-            htmlOutput.addEventListener('blur', () => {
-                const htmlContent = htmlOutput.innerHTML;
-                const markdownContent = turndownService.turndown(htmlContent);
-
-                // 内容が実際に変更された場合のみエディタを更新
-                if (markdownContent !== editor.getValue()) {
-                    // setValueはchangeイベントをトリガーし、
-                    // その中でプレビューの再レンダリング、カウンタ更新、保存が自動的に行われる
-                    editor.setValue(markdownContent);
+        
+        const downloadFile = (filename, content, mimeType) => {
+            const blob = new Blob([content], { type: mimeType });
+            const url = URL.createObjectURL(blob);
+            const a = document.createElement('a');
+            a.href = url;
+            a.download = filename;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+        
+        const showToast = (message, type = 'info', duration = 3000) => {
+            const container = getEl('toast-container');
+            const toast = document.createElement('div');
+            toast.className = `toast ${type}`;
+            toast.textContent = message;
+            container.appendChild(toast);
+            setTimeout(() => toast.classList.add('show'), 10);
+            setTimeout(() => {
+                toast.classList.remove('show');
+                toast.addEventListener('transitionend', () => toast.remove());
+            }, duration);
+        };
+        
+        // --- イベントリスナー ---
+        const addEventListeners = () => {
+            darkModeToggle.addEventListener('click', () => {
+                const isDark = document.body.classList.toggle('dark-mode');
+                localStorage.setItem('darkMode', isDark);
+                darkModeToggle.textContent = isDark ? '☀️' : '🌙';
+                editor.setOption('theme', isDark ? 'material-darker' : 'base16-light');
+            });
+            
+            toolbar.addEventListener('click', (e) => {
+                if (e.target.tagName === 'BUTTON') {
+                    applyStyle(e.target.dataset.action);
                 }
             });
-        };
 
-        // --- エクスポート機能 ---
-        const setButtonProcessing = (button, isProcessing, originalText) => {
-            if (isProcessing) {
-                button.textContent = '処理中...';
-                button.disabled = true;
-                button.classList.add('processing');
-            } else {
-                button.textContent = originalText;
-                button.disabled = false;
-                button.classList.remove('processing');
-            }
-        };
+            htmlOutput.addEventListener('input', updateFromPreview);
 
-        exportPdfButton.addEventListener('click', async () => {
-            const originalText = exportPdfButton.textContent;
-            setButtonProcessing(exportPdfButton, true);
+            fileSelect.addEventListener('change', (e) => loadFile(e.target.value));
 
-            const { jsPDF } = window.jspdf;
-            const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+            newFileBtn.addEventListener('click', () => {
+                const name = prompt('新しいファイル名:', '新規ドキュメント');
+                if (name) {
+                    const files = JSON.parse(localStorage.getItem('markdown_files'));
+                    const newId = Date.now().toString();
+                    files[newId] = { name, content: `# ${name}\n` };
+                    saveFiles(files);
+                    currentFileId = newId;
+                    populateFileSelect();
+                    loadFile(newId);
+                    showToast(`「${name}」を作成しました`, 'success');
+                }
+            });
             
-            try {
-                const canvas = await html2canvas(htmlOutput, { scale: 2, useCORS: true });
-                const imgData = canvas.toDataURL('image/png');
-                const imgProps = pdf.getImageProperties(imgData);
-                const pdfWidth = pdf.internal.pageSize.getWidth();
-                const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
-                
-                let heightLeft = pdfHeight;
-                let position = 0;
-                const pageHeight = pdf.internal.pageSize.getHeight();
+            renameFileBtn.addEventListener('click', () => {
+                const files = JSON.parse(localStorage.getItem('markdown_files'));
+                if (!files[currentFileId]) return;
+                const oldName = files[currentFileId].name;
+                const newName = prompt('新しいファイル名:', oldName);
+                if (newName && newName !== oldName) {
+                    files[currentFileId].name = newName;
+                    saveFiles(files);
+                    populateFileSelect();
+                    showToast('ファイル名を変更しました', 'success');
+                }
+            });
 
-                pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
-                heightLeft -= pageHeight;
+            deleteFileBtn.addEventListener('click', () => {
+                const files = JSON.parse(localStorage.getItem('markdown_files'));
+                if (!files[currentFileId]) return;
+                if (Object.keys(files).length <= 1) {
+                    showToast('最後のファイルは削除できません', 'error');
+                    return;
+                }
+                if (confirm(`「${files[currentFileId].name}」を本当に削除しますか？`)) {
+                    delete files[currentFileId];
+                    saveFiles(files);
+                    currentFileId = Object.keys(files)[0];
+                    populateFileSelect();
+                    loadFile(currentFileId);
+                    showToast('ファイルを削除しました');
+                }
+            });
 
-                while (heightLeft > 0) {
-                    position = heightLeft - pdfHeight;
-                    pdf.addPage();
+            clearButton.addEventListener('click', () => {
+                if (confirm('現在の内容をすべて消去しますか？')) {
+                    editor.setValue(''); editor.focus();
+                }
+            });
+
+            copyButton.addEventListener('click', async () => {
+                try {
+                    await navigator.clipboard.writeText(htmlOutput.innerText);
+                    showToast('プレビューをコピーしました', 'success');
+                } catch (err) {
+                    showToast('コピーに失敗しました', 'error');
+                }
+            });
+
+            exportMdButton.addEventListener('click', () => {
+                const files = JSON.parse(localStorage.getItem('markdown_files'));
+                const filename = (files[currentFileId]?.name || 'document') + '.md';
+                downloadFile(filename, editor.getValue(), 'text/markdown');
+            });
+
+            exportHtmlButton.addEventListener('click', () => {
+                const files = JSON.parse(localStorage.getItem('markdown_files'));
+                const filename = (files[currentFileId]?.name || 'document') + '.html';
+                const htmlContent = `<!DOCTYPE html><html><head><title>${files[currentFileId]?.name || 'Document'}</title><style>body{font-family:sans-serif;}</style></head><body>${htmlOutput.innerHTML}</body></html>`;
+                downloadFile(filename, htmlContent, 'text/html');
+            });
+
+            exportPdfButton.addEventListener('click', async () => {
+                showToast('PDFを生成中です...');
+                exportPdfButton.disabled = true;
+                const { jsPDF } = window.jspdf;
+                const pdf = new jsPDF({ orientation: 'p', unit: 'mm', format: 'a4' });
+                try {
+                    const canvas = await html2canvas(htmlOutput, { scale: 2, useCORS: true });
+                    const imgData = canvas.toDataURL('image/png');
+                    const imgProps = pdf.getImageProperties(imgData);
+                    const pdfWidth = pdf.internal.pageSize.getWidth();
+                    const pdfHeight = (imgProps.height * pdfWidth) / imgProps.width;
+                    let heightLeft = pdfHeight, position = 0;
+                    const pageHeight = pdf.internal.pageSize.getHeight();
                     pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
                     heightLeft -= pageHeight;
-                }
-                
-                pdf.save('document.pdf');
-            } catch (e) {
-                console.error("PDF生成エラー:", e);
-                alert("PDFの生成に失敗しました。");
-            } finally {
-                setButtonProcessing(exportPdfButton, false, originalText);
-            }
-        });
-
-        // --- プレゼンテーション機能 (イベントリスナーが存在しないため、定義のみとします) ---
-        const setupPresentationListener = () => {
-            // この機能を使うには、HTMLに<input type="checkbox" id="presentation-toggle">が必要です。
-            if (!presentationToggle) return; 
-
-            presentationToggle.addEventListener('change', () => {
-                if (presentationToggle.checked) {
-                    const markdown = editor.getValue();
-                    const marpit = new Marpit.Marpit();
-                    const { html, css } = marpit.render(markdown);
-
-                    presentationContainer.innerHTML = `<style>${css}</style><div class="marp-root">${html}</div>`;
-                    editorWorkspace.style.display = 'none';
-                    presentationContainer.style.display = 'block';
-
-                    document.addEventListener('keydown', exitPresentationOnEsc);
-                } else {
-                    editorWorkspace.style.display = 'block';
-                    presentationContainer.style.display = 'none';
-                    document.removeEventListener('keydown', exitPresentationOnEsc);
+                    while (heightLeft > 0) {
+                        position = heightLeft - pdfHeight;
+                        pdf.addPage();
+                        pdf.addImage(imgData, 'PNG', 0, position, pdfWidth, pdfHeight);
+                        heightLeft -= pageHeight;
+                    }
+                    pdf.save((JSON.parse(localStorage.getItem('markdown_files'))[currentFileId]?.name || 'document') + '.pdf');
+                    showToast('PDFの保存が完了しました', 'success');
+                } catch (e) {
+                    console.error("PDF生成エラー:", e);
+                    showToast('PDFの生成に失敗しました', 'error');
+                } finally {
+                    exportPdfButton.disabled = false;
                 }
             });
         };
-        const exitPresentationOnEsc = (e) => {
-            if (e.key === 'Escape' && presentationToggle) {
-                presentationToggle.checked = false;
-                presentationToggle.dispatchEvent(new Event('change'));
-            }
-        };
-        setupPresentationListener(); // プレゼン機能のリスナーを設定
-
-        // --- 既存のイベントリスナー ---
-        clearButton.addEventListener('click', () => { if (confirm('入力内容をすべて消去しますか？')) { editor.setValue(''); editor.focus(); }});
-        toolbar.addEventListener('click', (e) => { if (e.target.tagName === 'BUTTON') { const action = e.target.dataset.action; if (action) applyStyle(action); }});
-        
-        copyButton.addEventListener('click', async () => {
-            try {
-                await navigator.clipboard.writeText(htmlOutput.innerText);
-                copyButton.textContent = 'コピー完了!';
-                copyButton.classList.add('copied');
-                setTimeout(() => {
-                    copyButton.textContent = '見たままコピー';
-                    copyButton.classList.remove('copied');
-                }, 1500);
-            } catch (err) {
-                console.error('コピーに失敗しました: ', err);
-                alert('コピーに失敗しました。');
-            }
-        });
-
-        darkModeToggle.addEventListener('click', () => {
-            document.body.classList.toggle('dark-mode');
-            const isDark = document.body.classList.contains('dark-mode');
-            localStorage.setItem('darkMode', isDark);
-            darkModeToggle.textContent = isDark ? '☀️' : '🌙';
-            editor.setOption('theme', isDark ? 'material-darker' : 'base16-light');
-        });
-        
     </script>
 </body>
 </html>
